@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>EQ Project Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0f1e3d;--navy2:#1a2e54;--blue:#2563eb;--blue-lt:#3b82f6;
+  --teal:#0d9488;--green:#16a34a;--amber:#d97706;--red:#dc2626;--purple:#7c3aed;--gold:#f59e0b;
+  --bg:#eef2f7;--card:#fff;--border:#d1d9e6;--text:#1e2b45;--muted:#6b7a99;
+  --inprog:#dcfce7;--inprog-fg:#15803d;--inprog-bdr:#16a34a;
+  --notstart:#fef9c3;--notstart-fg:#854d0e;--notstart-bdr:#ca8a04;
+  --blocked:#fee2e2;--blocked-fg:#b91c1c;--blocked-bdr:#dc2626;
+  --complete:#dbeafe;--complete-fg:#1d4ed8;--complete-bdr:#2563eb;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* topbar */
+.topbar{background:var(--navy);padding:13px 24px;display:flex;align-items:center;gap:14px;border-bottom:3px solid var(--gold)}
+.topbar h1{font-family:'Space Grotesk',sans-serif;color:#fff;font-size:1.15rem;font-weight:700;letter-spacing:-.5px}
+.tabs{margin-left:auto;display:flex;gap:6px}
+.tab-btn{padding:6px 16px;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.83rem;font-weight:500;cursor:pointer;transition:.15s}
+.tab-btn.active{background:var(--gold);color:var(--navy)}
+.tab-btn:not(.active){background:rgba(255,255,255,.1);color:#cdd5e0}
+.tab-btn:not(.active):hover{background:rgba(255,255,255,.2)}
+
+/* views */
+.view{display:none;padding:18px 20px}
+.view.active{display:block}
+
+/* stats */
+.stats{display:flex;gap:11px;margin-bottom:16px;flex-wrap:wrap}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 16px;flex:1;min-width:120px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--blue)}
+.stat-card.green::before{background:var(--green)}
+.stat-card.red::before{background:var(--red)}
+.stat-card.purple::before{background:var(--purple)}
+.stat-card .label{font-size:.7rem;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.stat-card .val{font-size:1.5rem;font-weight:700;font-family:'Space Grotesk',sans-serif;line-height:1.1;margin-top:2px}
+
+/* flowchart */
+.chart-section{margin-bottom:32px}
+.chart-section-title{font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:12px;padding:0 4px}
+.chart-scroll{overflow-x:auto;padding-bottom:20px;position:relative}
+.chart-inner{display:inline-flex;flex-direction:column;align-items:center;min-width:100%;padding:0 16px}
+.hub-node{background:var(--navy);color:#fff;border:3px solid var(--gold);box-shadow:0 4px 20px rgba(15,30,61,.3);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.9rem;border-radius:999px;padding:10px 28px;white-space:nowrap}
+.end-node{background:var(--teal);color:#fff;border:2px solid rgba(255,255,255,.3);box-shadow:0 4px 16px rgba(13,148,136,.35);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.88rem;border-radius:999px;padding:9px 26px;white-space:nowrap}
+.ws-row{display:flex;gap:10px;align-items:flex-start;padding:0 4px;flex-wrap:wrap;justify-content:center}
+.ws-card{width:180px;height:280px;border-radius:14px;border:2.5px solid;overflow:hidden;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 2px 10px rgba(0,0,0,.08);flex-shrink:0;display:flex;flex-direction:column}
+.ws-card:hover{transform:translateY(-4px);box-shadow:0 10px 28px rgba(0,0,0,.16)}
+.ws-card.inprog  {background:var(--inprog);  border-color:var(--inprog-bdr)}
+.ws-card.notstart{background:var(--notstart);border-color:var(--notstart-bdr)}
+.ws-card.blocked {background:var(--blocked); border-color:var(--blocked-bdr)}
+.ws-card.complete{background:var(--complete);border-color:var(--complete-bdr)}
+.ws-card-header{padding:9px 10px 6px;flex-shrink:0}
+.ws-card-name{font-weight:700;font-size:.77rem;line-height:1.25;display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-bottom:5px}
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:2px}
+.dot-high{background:var(--red)}.dot-med{background:var(--amber)}.dot-low{background:var(--green)}
+.poc-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:2px}
+.poc-tag{font-size:.63rem;color:var(--muted);font-weight:500;background:rgba(255,255,255,.55);border-radius:5px;padding:2px 5px;white-space:nowrap}
+.ws-card-phases{border-top:1.5px solid rgba(0,0,0,.08);padding:7px 9px 8px;display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto}
+.phase-row{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.phase-label{font-size:.61rem;font-weight:600;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.phase-bar-wrap{width:30px;background:rgba(0,0,0,.1);border-radius:99px;height:4px;flex-shrink:0}
+.phase-bar{height:100%;border-radius:99px;transition:.4s}
+.pb-order{background:#6366f1}.pb-som{background:#8b5cf6}.pb-pkg{background:#3b82f6}.pb-proc{background:#7c3aed}.pb-rev{background:#0d9488}
+.phase-val{font-family:'Space Grotesk',sans-serif;font-size:.74rem;font-weight:700;width:20px;text-align:right;flex-shrink:0}
+.ws-card-footer{background:rgba(0,0,0,.06);padding:5px 9px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;margin-top:auto}
+.ws-card-footer span{font-size:.62rem;color:var(--muted);font-weight:600}
+.ws-card-footer strong{font-family:'Space Grotesk',sans-serif;font-size:.75rem;font-weight:700}
+
+/* ── TABLE ── */
+.action-bar{display:flex;gap:9px;align-items:center;margin-bottom:13px;flex-wrap:wrap}
+.btn{padding:7px 16px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer;transition:.14s}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:var(--navy2)}
+.btn-gold{background:var(--gold);color:var(--navy)}.btn-gold:hover{background:#e08e00}
+.btn-outline{background:#fff;color:var(--navy);border:1.5px solid var(--border)}.btn-outline:hover{border-color:var(--blue-lt);background:#f0f6ff}
+.save-note{font-size:.77rem;color:var(--muted);font-style:italic}
+
+.table-section{margin-bottom:32px}
+.table-section-title{font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:12px}
+
+.table-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--border);box-shadow:0 2px 16px rgba(0,0,0,.06)}
+table.tracker{width:100%;border-collapse:collapse;background:var(--card);font-size:.81rem;table-layout:auto}
+table.tracker thead th{
+  background:var(--navy2);color:#fff;font-weight:600;padding:9px 10px;
+  text-align:center;white-space:nowrap;font-family:'Space Grotesk',sans-serif;
+  font-size:.77rem;letter-spacing:.02em;position:relative;user-select:none;
+}
+table.tracker thead th.drag-over-col{background:#1e3a6e;outline:3px solid var(--gold)}
+table.tracker thead th .th-inner{display:flex;align-items:center;justify-content:center;gap:6px}
+table.tracker thead th .drag-handle-col{
+  cursor:grab;opacity:.5;font-size:.85rem;flex-shrink:0;
+  padding:2px 3px;border-radius:4px;transition:.12s;
+}
+table.tracker thead th .drag-handle-col:hover{opacity:1;background:rgba(255,255,255,.15)}
+table.tracker thead th .drag-handle-col:active{cursor:grabbing}
+
+table.tracker tbody tr{transition:background .1s}
+table.tracker tbody tr:nth-child(even){background:#f7faff}
+table.tracker tbody tr:hover{background:#eef3fd}
+table.tracker tbody tr.dragging-row{opacity:.4;background:#e0eaff!important}
+table.tracker tbody tr.drag-over-row{border-top:3px solid var(--gold)}
+table.tracker td{padding:7px 9px;border-bottom:1px solid #e8edf5;text-align:center;vertical-align:middle}
+
+/* row drag handle column */
+td.row-handle{cursor:grab;color:var(--muted);font-size:1rem;padding:0 8px;width:24px}
+td.row-handle:active{cursor:grabbing}
+
+table.tracker input,table.tracker select{
+  border:1px solid var(--border);border-radius:6px;padding:4px 6px;font-size:.78rem;
+  font-family:'DM Sans',sans-serif;background:#f9fbff;width:100%;text-align:center;outline:none;transition:.12s;
+}
+table.tracker input:focus,table.tracker select:focus{border-color:var(--blue-lt);background:#fff;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
+.status-pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:.69rem;font-weight:700;white-space:nowrap}
+.pill-inprog  {background:var(--inprog);  color:var(--inprog-fg)}
+.pill-notstart{background:var(--notstart);color:var(--notstart-fg)}
+.pill-blocked {background:var(--blocked); color:var(--blocked-fg)}
+.pill-complete{background:var(--complete);color:var(--complete-fg)}
+.pct-bar-wrap{background:#e9eef7;border-radius:99px;height:5px;min-width:44px}
+.pct-bar{height:100%;border-radius:99px;background:var(--blue);transition:.4s}
+
+/* tooltip */
+.tooltip{position:fixed;background:var(--navy);color:#fff;border-radius:12px;padding:12px 16px;font-size:.79rem;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;min-width:205px;box-shadow:0 8px 32px rgba(0,0,0,.35)}
+.tooltip.visible{opacity:1}
+.tooltip .tt-title{font-weight:700;font-size:.9rem;margin-bottom:8px;color:var(--gold)}
+.tooltip table{border-collapse:collapse;width:100%}
+.tooltip td{padding:2px 6px 2px 0;color:#cbd5e1}
+.tooltip td:last-child{color:#fff;font-weight:600;text-align:right}
+
+/* drag ghost */
+.drag-ghost{position:fixed;pointer-events:none;z-index:10000;background:var(--navy2);color:#fff;border-radius:8px;padding:6px 14px;font-size:.8rem;font-weight:600;opacity:.85;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>EQ Project Tracker</h1>
+  <span id="topSaveIndicator" style="font-size:.72rem;color:#86efac;font-weight:500;opacity:0;transition:opacity .5s;margin-left:4px"></span>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('flowchart',this)">🗂 Flowchart</button>
+    <button class="tab-btn" onclick="switchTab('table',this)">📋 Edit Table</button>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="drag-ghost" id="dragGhost" style="display:none"></div>
+
+<!-- FLOWCHART -->
+<div class="view active" id="view-flowchart">
+  <div class="stats" id="stats-row"></div>
+  
+  <!-- Main Project Flowchart -->
+  <div class="chart-section">
+    <div class="chart-section-title">GC + EQ Initiatives</div>
+    <div class="chart-scroll">
+      <div class="chart-inner" id="chartInner">
+        <div id="hub-wrap" style="margin-bottom:0"><div class="hub-node">GC + EQ Initiatives</div></div>
+        <div style="height:30px"></div>
+        <div class="ws-row" id="wsRow"></div>
+        <div style="height:30px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Weekly Updates Flowchart -->
+  <div class="chart-section">
+    <div class="chart-section-title">Weekly Updates</div>
+    <div class="chart-scroll">
+      <div class="chart-inner" id="chartInnerWeekly">
+        <div id="hub-wrap-weekly" style="margin-bottom:0"><div class="hub-node">Weekly Updates</div></div>
+        <div style="height:30px"></div>
+        <div class="ws-row" id="wsRowWeekly"></div>
+        <div style="height:30px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="view" id="view-table">
+  <!-- Main Projects Table -->
+  <div class="table-section">
+    <div class="table-section-title">GC + EQ Initiatives</div>
+    <div class="action-bar">
+      <button class="btn btn-primary" onclick="addWorkstream()">＋ Add Workstream</button>
+      <button class="btn btn-gold" onclick="saveAndRefresh()">↺ Sync Flowchart</button>
+      <button class="btn btn-outline" onclick="exportCSV('main')">⬇ Export CSV</button>
+      <span class="save-note" id="saveNote">Drag ⠿ to reorder rows · Drag ⠿ on column headers to reorder columns.</span>
+      <span id="saveIndicator" style="font-size:.77rem;font-weight:600;opacity:0;transition:opacity .5s;margin-left:6px"></span>
+      <button class="btn btn-outline" onclick="resetState()" style="margin-left:auto;color:var(--red);border-color:#fca5a5" title="Reset to defaults">↺ Reset</button>
+    </div>
+    <div class="table-wrap">
+      <table class="tracker" id="dataTable">
+        <thead><tr id="headerRow"></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Weekly Updates Table -->
+  <div class="table-section">
+    <div class="table-section-title">Weekly Updates</div>
+    <div class="action-bar">
+      <button class="btn btn-primary" onclick="addWeeklyUpdate()">＋ Add Update</button>
+      <button class="btn btn-gold" onclick="saveAndRefreshWeekly()">↺ Sync Flowchart</button>
+      <button class="btn btn-outline" onclick="exportCSV('weekly')">⬇ Export CSV</button>
+      <span id="saveIndicatorWeekly" style="font-size:.77rem;font-weight:600;opacity:0;transition:opacity .5s;margin-left:6px"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="tracker" id="dataTableWeekly">
+        <thead><tr id="headerRowWeekly"></tr></thead>
+        <tbody id="tableBodyWeekly"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════ DEFAULT DATA ════════════════════════════════════════
+const DEFAULT_DATA = [
+  {id:1,  name:"Initial Stratifications",  poc_eq:"TBD",poc_gc:"TBD",priority:"High",  start:"14 Apr 2022",target:"23 Jun 2022",order:15,som:10,pkg:10,proc:10,rev:4, eq_co:0,gc_co:6, status:"In Progress"},
+  {id:2,  name:"Restratification – HIR",   poc_eq:"TBD",poc_gc:"TBD",priority:"Medium",start:"29 Apr 2022",target:"8 Jul 2022", order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"Not Started"},
+  {id:3,  name:"Restratification – Regen", poc_eq:"TBD",poc_gc:"TBD",priority:"High",  start:"24 Apr 2022",target:"3 Jul 2022", order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"Blocked"},
+  {id:4,  name:"Restratification – AD",    poc_eq:"TBD",poc_gc:"TBD",priority:"High",  start:"14 Apr 2022",target:"23 Jun 2022",order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"In Progress"},
+  {id:5,  name:"Change Detection",         poc_eq:"TBD",poc_gc:"TBD",priority:"Medium",start:"29 Apr 2022",target:"8 Jul 2022", order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"Not Started"},
+  {id:6,  name:"Fire Impact Assessment",   poc_eq:"TBD",poc_gc:"TBD",priority:"High",  start:"24 Apr 2022",target:"3 Jul 2022", order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"Blocked"},
+  {id:7,  name:"AD Survey Packages",       poc_eq:"TBD",poc_gc:"TBD",priority:"High",  start:"14 Apr 2022",target:"3 Jul 2022", order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"In Progress"},
+  {id:8,  name:"Survey Packages",          poc_eq:"TBD",poc_gc:"TBD",priority:"Medium",start:"29 Apr 2022",target:"3 Jul 2022", order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"Not Started"},
+  {id:9,  name:"Grid Creation",            poc_eq:"TBD",poc_gc:"TBD",priority:"High",  start:"24 Apr 2022",target:"3 Jul 2022", order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"Blocked"},
+  {id:10, name:"Ad Hoc / Other",           poc_eq:"TBD",poc_gc:"TBD",priority:"High",  start:"29 Apr 2022",target:"3 Jul 2022", order:0, som:0, pkg:0, proc:0, rev:0, eq_co:0,gc_co:0, status:"In Progress"},
+];
+
+const DEFAULT_WEEKLY_DATA = [
+  {id:1, week:"Week 1", status:"In Progress", owner:"TBD", update:"Initial planning phase", priority:"High"},
+  {id:2, week:"Week 2", status:"In Progress", owner:"TBD", update:"Requirements gathering", priority:"Medium"},
+];
+
+// ═══════════════════════ PERSISTENCE (localStorage) ═══════════════════════════
+const STORE_KEY = 'eq_tracker_v1';
+const STORE_KEY_WEEKLY = 'eq_tracker_weekly_v1';
+let saveTimer = null;
+
+function saveState(){
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ data, colDefs, nextId }));
+    localStorage.setItem(STORE_KEY_WEEKLY, JSON.stringify({ weeklyData, weeklyColDefs, nextWeeklyId }));
+    showSaveIndicator();
+  } catch(e){ console.warn('Save failed:', e); }
+}
+
+function loadState(){
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      const s = JSON.parse(raw);
+      if(s.data    && Array.isArray(s.data))    { data    = s.data; }
+      if(s.colDefs && Array.isArray(s.colDefs)) { colDefs = s.colDefs; }
+      if(s.nextId  && typeof s.nextId==='number') { nextId = s.nextId; }
+    }
+    const rawWeekly = localStorage.getItem(STORE_KEY_WEEKLY);
+    if(rawWeekly){
+      const sw = JSON.parse(rawWeekly);
+      if(sw.weeklyData    && Array.isArray(sw.weeklyData))    { weeklyData    = sw.weeklyData; }
+      if(sw.weeklyColDefs && Array.isArray(sw.weeklyColDefs)) { weeklyColDefs = sw.weeklyColDefs; }
+      if(sw.nextWeeklyId  && typeof sw.nextWeeklyId==='number') { nextWeeklyId = sw.nextWeeklyId; }
+    }
+    return true;
+  } catch(e){ console.warn('Load failed:', e); return false; }
+}
+
+function resetState(){
+  if(!confirm('Reset all data to defaults? This cannot be undone.')) return;
+  localStorage.removeItem(STORE_KEY);
+  localStorage.removeItem(STORE_KEY_WEEKLY);
+  location.reload();
+}
+
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveState, 600);
+}
+
+function showSaveIndicator(){
+  ['saveIndicator','topSaveIndicator'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = '💾 Auto-saved';
+    el.style.opacity = '1';
+    el.style.color = id==='topSaveIndicator' ? '#86efac' : '#16a34a';
+    clearTimeout(el._ft);
+    el._ft = setTimeout(()=>{ el.style.opacity='0'; }, 2400);
+  });
+}
+
+// ═══════════════════════ LIVE DATA ═══════════════════════════════════════════
+let data   = JSON.parse(JSON.stringify(DEFAULT_DATA));
+let nextId = 11;
+let weeklyData = JSON.parse(JSON.stringify(DEFAULT_WEEKLY_DATA));
+let nextWeeklyId = 3;
+
+let colDefs = [
+  {key:'name',    label:'Workstream',               width:165, fixed:true},
+  {key:'poc_eq',  label:'POC (EQ)',                 width:85},
+  {key:'poc_gc',  label:'POC (GC)',                 width:85},
+  {key:'priority',label:'Priority',                 width:80},
+  {key:'start',   label:'Start Date',               width:95},
+  {key:'target',  label:'Target Date',              width:95},
+  {key:'order',   label:'Order Form<br>(GC+EQ)',    width:64, numeric:true},
+  {key:'som',     label:'Start of Month<br>(GC+EQ)',width:72, numeric:true},
+  {key:'pkg',     label:'Package<br>Completed (GC)',width:72, numeric:true},
+  {key:'proc',    label:'Processing<br>Cmpltd (EQ)',width:76, numeric:true},
+  {key:'rev',     label:'Review<br>Completed (GC)', width:72, numeric:true},
+  {key:'pct_som', label:'% Complete<br>(SOM)',      width:72, computed:true},
+  {key:'pct_ord', label:'% Complete<br>(Order)',    width:72, computed:true},
+  {key:'eq_co',   label:'EQ Carry<br>Over',         width:60, numeric:true},
+  {key:'gc_co',   label:'GC Carry<br>Over',         width:60, numeric:true},
+  {key:'status',  label:'Status',                   width:100},
+];
+
+let weeklyColDefs = [
+  {key:'week',    label:'Week',     width:80, fixed:true},
+  {key:'status',  label:'Status',   width:100},
+  {key:'owner',   label:'Owner',    width:90},
+  {key:'update',  label:'Update',   width:200},
+  {key:'priority',label:'Priority', width:80},
+];
+
+const STATUS_CLS  = {"In Progress":"inprog","Not Started":"notstart","Blocked":"blocked","Complete":"complete"};
+const STATUS_TEXT = {"In Progress":"#15803d","Not Started":"#854d0e","Blocked":"#b91c1c","Complete":"#1d4ed8"};
+const PRIO_DOT    = {"High":"dot-high","Medium":"dot-med","Low":"dot-low"};
+const PILL_CLS    = {"In Progress":"pill-inprog","Not Started":"pill-notstart","Blocked":"pill-blocked","Complete":"pill-complete"};
+
+function pctSOM(d)  { return d.som   > 0 ? d.rev/d.som   : 0; }
+function pctOrder(d){ return d.order > 0 ? d.rev/d.order : 0; }
+function fmt(n)     { return (n*100).toFixed(1)+'%'; }
+function esc(s)     { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// ═══════════════════════ TAB SWITCH ══════════════════════════════════════════
+function switchTab(id, btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if(id==='flowchart'){ renderFlowchart(); }
+  else                { renderTable(); }
+}
+
+// ═══════════════════════ FLOWCHART ═══════════════════════════════════════════
+function renderFlowchart(){
+  renderStats();
+  renderFlowchartCards('main');
+  renderFlowchartCards('weekly');
+}
+
+function renderFlowchartCards(type='main'){
+  const source = type === 'weekly' ? weeklyData : data;
+  const rowId = type === 'weekly' ? 'wsRowWeekly' : 'wsRow';
+  const row = document.getElementById(rowId);
+  row.innerHTML = '';
+  
+  source.forEach(d=>{
+    const cls = type === 'weekly' ? STATUS_CLS[d.status] || 'notstart' : STATUS_CLS[d.status]||'notstart';
+    const dotCls = type === 'weekly' ? PRIO_DOT[d.priority]||'dot-low' : PRIO_DOT[d.priority]||'dot-low';
+    const txtCol = STATUS_TEXT[d.status]||'#334155';
+    
+    let card = document.createElement('div');
+    card.className = `ws-card ${cls}`;
+    
+    if(type === 'weekly'){
+      card.innerHTML = `
+        <div class="ws-card-header">
+          <div class="ws-card-name"><span>${d.week}</span><span class="dot ${dotCls}"></span></div>
+          <div class="poc-row">
+            <span class="poc-tag">Owner: ${d.owner||'–'}</span>
+          </div>
+        </div>
+        <div class="ws-card-phases" style="flex:1;padding:7px 9px">
+          <div style="font-size:.75rem;color:${txtCol};line-height:1.4">${d.update}</div>
+        </div>
+        <div class="ws-card-footer">
+          <span>Priority</span>
+          <strong style="color:${txtCol}">${d.priority}</strong>
+        </div>`;
+      card.addEventListener('mouseenter',e=>showTooltipWeekly(e,d));
+    } else {
+      const maxVal = Math.max(d.order,1);
+      const phases = [
+        {label:'Order Form (GC+EQ)',    val:d.order, bar:'pb-order'},
+        {label:'Start of Month (GC+EQ)',val:d.som,   bar:'pb-som'},
+        {label:'Package Cmpltd (GC)',   val:d.pkg,   bar:'pb-pkg'},
+        {label:'Processing Cmpltd (EQ)',val:d.proc,  bar:'pb-proc'},
+        {label:'Review Cmpltd (GC)',    val:d.rev,   bar:'pb-rev'},
+      ];
+      const phaseHTML = phases.map(ph=>`
+        <div class="phase-row">
+          <span class="phase-label">${ph.label}</span>
+          <div class="phase-bar-wrap"><div class="phase-bar ${ph.bar}" style="width:${Math.min(ph.val/maxVal,1)*100}%"></div></div>
+          <span class="phase-val" style="color:${txtCol}">${ph.val}</span>
+        </div>`).join('');
+      card.innerHTML = `
+        <div class="ws-card-header">
+          <div class="ws-card-name"><span>${d.name}</span><span class="dot ${dotCls}"></span></div>
+          <div class="poc-row">
+            <span class="poc-tag">EQ: ${d.poc_eq||'–'}</span>
+            <span class="poc-tag">GC: ${d.poc_gc||'–'}</span>
+          </div>
+        </div>
+        <div class="ws-card-phases">${phaseHTML}</div>
+        <div class="ws-card-footer">
+          <span>% (SOM)</span>
+          <strong style="color:${txtCol}">${fmt(pctSOM(d))}</strong>
+        </div>`;
+      card.addEventListener('mouseenter',e=>showTooltip(e,d));
+    }
+    
+    card.addEventListener('mousemove', e=>{ const t=document.getElementById('tooltip'); t.style.left=(e.clientX+14)+'px'; t.style.top=(e.clientY-10)+'px'; });
+    card.addEventListener('mouseleave',()=>hideTooltip());
+    card.addEventListener('click',()=>switchTab('table',document.querySelectorAll('.tab-btn')[1]));
+    row.appendChild(card);
+  });
+}
+
+function showTooltip(e,d){
+  const t=document.getElementById('tooltip');
+  t.innerHTML=`<div class="tt-title">${d.name}</div><table>
+    <tr><td>POC (EQ)</td><td>${d.poc_eq||'–'}</td></tr>
+    <tr><td>POC (GC)</td><td>${d.poc_gc||'–'}</td></tr>
+    <tr><td>Priority</td><td>${d.priority}</td></tr>
+    <tr><td>Status</td><td>${d.status}</td></tr>
+    <tr><td>Order Form</td><td>${d.order}</td></tr>
+    <tr><td>Start of Month</td><td>${d.som}</td></tr>
+    <tr><td>Package Completed</td><td>${d.pkg}</td></tr>
+    <tr><td>Processing Completed</td><td>${d.proc}</td></tr>
+    <tr><td>Review Completed</td><td>${d.rev}</td></tr>
+    <tr><td>% (SOM)</td><td>${fmt(pctSOM(d))}</td></tr>
+    <tr><td>% (Order)</td><td>${fmt(pctOrder(d))}</td></tr>
+  </table>`;
+  t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY-10)+'px';
+  t.classList.add('visible');
+}
+
+function showTooltipWeekly(e,d){
+  const t=document.getElementById('tooltip');
+  t.innerHTML=`<div class="tt-title">${d.week}</div><table>
+    <tr><td>Owner</td><td>${d.owner||'–'}</td></tr>
+    <tr><td>Status</td><td>${d.status}</td></tr>
+    <tr><td>Priority</td><td>${d.priority}</td></tr>
+    <tr><td>Update</td><td>${d.update}</td></tr>
+  </table>`;
+  t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY-10)+'px';
+  t.classList.add('visible');
+}
+
+function hideTooltip(){ document.getElementById('tooltip').classList.remove('visible'); }
+
+function renderStats(){
+  const total=data.length, inprog=data.filter(d=>d.status==='In Progress').length;
+  const blocked=data.filter(d=>d.status==='Blocked').length, done=data.filter(d=>d.status==='Complete').length;
+  const avg=data.reduce((s,d)=>s+pctSOM(d),0)/Math.max(total,1);
+  document.getElementById('stats-row').innerHTML=`
+    <div class="stat-card"><div class="label">Total</div><div class="val">${total}</div></div>
+    <div class="stat-card green"><div class="label">In Progress</div><div class="val" style="color:var(--green)">${inprog}</div></div>
+    <div class="stat-card red"><div class="label">Blocked</div><div class="val" style="color:var(--red)">${blocked}</div></div>
+    <div class="stat-card"><div class="label">Complete</div><div class="val" style="color:var(--blue)">${done}</div></div>
+    <div class="stat-card purple"><div class="label">Avg % (SOM)</div><div class="val" style="color:var(--purple)">${fmt(avg)}</div></div>`;
+}
+
+// ═══════════════════════ TABLE RENDER ════════════════════════════════════════
+function renderTable(){
+  renderHeaders('main');
+  renderRows('main');
+  renderHeaders('weekly');
+  renderRows('weekly');
+}
+
+function renderHeaders(type='main'){
+  const hr = type === 'weekly' ? document.getElementById('headerRowWeekly') : document.getElementById('headerRow');
+  const cols = type === 'weekly' ? weeklyColDefs : colDefs;
+  hr.innerHTML = '';
+
+  const thHandle = document.createElement('th');
+  thHandle.style.width='28px'; thHandle.style.padding='9px 4px';
+  thHandle.innerHTML='<span style="opacity:.4;font-size:.7rem">⠿</span>';
+  hr.appendChild(thHandle);
+
+  cols.forEach((col, ci)=>{
+    const th = document.createElement('th');
+    th.dataset.colIdx = ci;
+    th.innerHTML = `<div class="th-inner">
+      <span class="drag-handle-col" title="Drag to reorder column">⠿</span>
+      <span>${col.label}</span>
+    </div>`;
+    th.style.minWidth = col.width+'px';
+    const handle = th.querySelector('.drag-handle-col');
+    handle.addEventListener('mousedown', e=>startColDrag(e, ci, type));
+    hr.appendChild(th);
+  });
+
+  const thDel = document.createElement('th');
+  thDel.style.width='32px';
+  hr.appendChild(thDel);
+}
+
+function renderRows(type='main'){
+  const body = type === 'weekly' ? document.getElementById('tableBodyWeekly') : document.getElementById('tableBody');
+  const source = type === 'weekly' ? weeklyData : data;
+  const cols = type === 'weekly' ? weeklyColDefs : colDefs;
+  body.innerHTML = '';
+  
+  source.forEach((d,rowIdx)=>{
+    const tr = document.createElement('tr');
+    tr.dataset.id = d.id;
+
+    const tdHandle = document.createElement('td');
+    tdHandle.className = 'row-handle';
+    tdHandle.innerHTML = '⠿';
+    tdHandle.title = 'Drag to reorder row';
+    tdHandle.addEventListener('mousedown', e=>startRowDrag(e, rowIdx, type));
+    tr.appendChild(tdHandle);
+
+    cols.forEach(col=>{
+      const td = document.createElement('td');
+      td.innerHTML = buildCell(d, col, type);
+      tr.appendChild(td);
+    });
+
+    const tdDel = document.createElement('td');
+    tdDel.innerHTML = `<button onclick="deleteRow(${d.id},'${type}')" style="background:none;border:none;cursor:pointer;font-size:.95rem;padding:2px 4px" title="Delete">🗑</button>`;
+    tr.appendChild(tdDel);
+
+    body.appendChild(tr);
+  });
+}
+
+function buildCell(d, col, type='main'){
+  const k = col.key;
+  if(type === 'weekly'){
+    if(k==='week')    return `<input value="${esc(d.week)}" onchange="updateWeekly(${d.id},'week',this.value)" style="text-align:left;font-weight:600;width:${col.width-10}px"/>`;
+    if(k==='owner')   return `<input value="${esc(d.owner)}" onchange="updateWeekly(${d.id},'owner',this.value)" style="width:${col.width-6}px"/>`;
+    if(k==='update')  return `<input value="${esc(d.update)}" onchange="updateWeekly(${d.id},'update',this.value)" style="width:${col.width-6}px"/>`;
+    if(k==='priority')return `<select onchange="updateWeekly(${d.id},'priority',this.value)">${['High','Medium','Low'].map(p=>`<option${p===d.priority?' selected':''}>${p}</option>`).join('')}</select>`;
+    if(k==='status')  return `
+      <select onchange="updateWeekly(${d.id},'status',this.value)">
+        ${['In Progress','Not Started','Blocked','Complete'].map(s=>`<option${s===d.status?' selected':''}>${s}</option>`).join('')}
+      </select>
+      <div style="margin-top:3px"><span class="status-pill ${PILL_CLS[d.status]||''}">${d.status}</span></div>`;
+  } else {
+    if(k==='name')    return `<input value="${esc(d.name)}" onchange="update(${d.id},'name',this.value)" style="text-align:left;font-weight:600;width:${col.width-10}px"/>`;
+    if(k==='poc_eq')  return `<input value="${esc(d.poc_eq)}" onchange="update(${d.id},'poc_eq',this.value)" style="width:${col.width-6}px"/>`;
+    if(k==='poc_gc')  return `<input value="${esc(d.poc_gc)}" onchange="update(${d.id},'poc_gc',this.value)" style="width:${col.width-6}px"/>`;
+    if(k==='priority')return `<select onchange="update(${d.id},'priority',this.value)">${['High','Medium','Low'].map(p=>`<option${p===d.priority?' selected':''}>${p}</option>`).join('')}</select>`;
+    if(k==='start')   return `<input value="${esc(d.start)}"  onchange="update(${d.id},'start',this.value)"  style="width:${col.width-6}px"/>`;
+    if(k==='target')  return `<input value="${esc(d.target)}" onchange="update(${d.id},'target',this.value)" style="width:${col.width-6}px"/>`;
+    if(k==='status')  return `
+      <select onchange="update(${d.id},'status',this.value)">
+        ${['In Progress','Not Started','Blocked','Complete'].map(s=>`<option${s===d.status?' selected':''}>${s}</option>`).join('')}
+      </select>
+      <div style="margin-top:3px"><span class="status-pill ${PILL_CLS[d.status]||''}">${d.status}</span></div>`;
+    if(k==='pct_som') return pctCell(pctSOM(d));
+    if(k==='pct_ord') return pctCell(pctOrder(d));
+    if(col.numeric)   return `<input type="number" min="0" value="${d[k]}" onchange="update(${d.id},'${k}',+this.value)" style="width:${col.width-8}px"/>`;
+    return esc(d[k]||'');
+  }
+}
+
+function pctCell(v){
+  return `<div class="pct-bar-wrap"><div class="pct-bar" style="width:${v*100}%"></div></div>
+    <div style="font-size:.69rem;text-align:center;margin-top:2px;color:var(--muted)">${fmt(v)}</div>`;
+}
+
+function update(id,field,val){ const r=data.find(r=>r.id===id); if(r){r[field]=val; renderRows('main'); flash(); scheduleSave();} }
+function updateWeekly(id,field,val){ const r=weeklyData.find(r=>r.id===id); if(r){r[field]=val; renderRows('weekly'); flash(); scheduleSave();} }
+function deleteRow(id,type='main'){ 
+  if(type === 'weekly') weeklyData=weeklyData.filter(r=>r.id!==id); 
+  else data=data.filter(r=>r.id!==id); 
+  renderTable(); flash(); scheduleSave(); 
+}
+function flash(){ const n=document.getElementById('saveNote'); n.textContent='⚡ Changes made – click Sync Flowchart to update.'; n.style.color='#dc2626'; }
+function saveAndRefresh(){ const n=document.getElementById('saveNote'); n.textContent='✅ Flowchart synced!'; n.style.color='var(--green)'; renderFlowchart(); renderTable(); saveState(); }
+function saveAndRefreshWeekly(){ const n=document.getElementById('saveNote'); n.textContent='✅ Flowchart synced!'; n.style.color='var(--green)'; renderFlowchart(); renderTable(); saveState(); }
+function addWorkstream(){
+  data.push({id:nextId++,name:`Workstream ${data.length+1}`,poc_eq:'TBD',poc_gc:'TBD',priority:'Medium',start:'',target:'',order:0,som:0,pkg:0,proc:0,rev:0,eq_co:0,gc_co:0,status:'Not Started'});
+  renderTable(); flash(); scheduleSave();
+}
+function addWeeklyUpdate(){
+  weeklyData.push({id:nextWeeklyId++,week:`Week ${weeklyData.length+1}`,status:'In Progress',owner:'TBD',update:'',priority:'Medium'});
+  renderTable(); flash(); scheduleSave();
+}
+function exportCSV(type='main'){
+  const source = type === 'weekly' ? weeklyData : data;
+  const cols = type === 'weekly' ? weeklyColDefs : colDefs;
+  const keys=cols.filter(c=>!c.computed).map(c=>c.key);
+  const hdrs=cols.filter(c=>!c.computed).map(c=>c.label.replace(/<br>/g,' '));
+  let csv=hdrs.join(',')+'\n';
+  source.forEach(d=>{ csv+=keys.map(k=>'"'+(d[k]??'')+'"').join(',')+'\n'; });
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=type==='weekly'?'EQ_Weekly_Updates.csv':'EQ_Project_Tracker.csv'; a.click();
+}
+
+// ═══════════════════════ ROW DRAG & DROP ═════════════════════════════════════
+let rowDrag = { active:false, srcIdx:null, ghost:null, type:null };
+
+function startRowDrag(e, rowIdx, type='main'){
+  e.preventDefault();
+  rowDrag.active  = true;
+  rowDrag.srcIdx  = rowIdx;
+  rowDrag.type = type;
+
+  const source = type === 'weekly' ? weeklyData : data;
+  const ghost = document.getElementById('dragGhost');
+  const label = type === 'weekly' ? source[rowIdx].week : source[rowIdx].name;
+  ghost.textContent = '↕ ' + label;
+  ghost.style.display = 'block';
+  ghost.style.left = (e.clientX+12)+'px';
+  ghost.style.top  = (e.clientY-10)+'px';
+  rowDrag.ghost = ghost;
+
+  document.addEventListener('mousemove', onRowDragMove);
+  document.addEventListener('mouseup',   onRowDragEnd);
+}
+
+function onRowDragMove(e){
+  if(!rowDrag.active) return;
+  rowDrag.ghost.style.left=(e.clientX+12)+'px';
+  rowDrag.ghost.style.top =(e.clientY-10)+'px';
+
+  const tbody = rowDrag.type === 'weekly' ? document.getElementById('tableBodyWeekly') : document.getElementById('tableBody');
+  document.querySelectorAll(tbody.id ? '#'+tbody.id+' tr' : 'tr').forEach((tr,i)=>{
+    tr.classList.remove('drag-over-row');
+    const r=tr.getBoundingClientRect();
+    if(e.clientY>=r.top && e.clientY<=r.bottom) tr.classList.add('drag-over-row');
+  });
+}
+
+function onRowDragEnd(e){
+  if(!rowDrag.active) return;
+  rowDrag.ghost.style.display='none';
+  document.removeEventListener('mousemove',onRowDragMove);
+  document.removeEventListener('mouseup',onRowDragEnd);
+
+  const tbody = rowDrag.type === 'weekly' ? document.getElementById('tableBodyWeekly') : document.getElementById('tableBody');
+  let targetIdx = null;
+  document.querySelectorAll(tbody.id ? '#'+tbody.id+' tr' : 'tr').forEach((tr,i)=>{
+    tr.classList.remove('drag-over-row');
+    const r=tr.getBoundingClientRect();
+    if(e.clientY>=r.top && e.clientY<=r.bottom) targetIdx=i;
+  });
+
+  if(targetIdx!==null && targetIdx!==rowDrag.srcIdx){
+    const source = rowDrag.type === 'weekly' ? weeklyData : data;
+    const [moved] = source.splice(rowDrag.srcIdx,1);
+    source.splice(targetIdx,0,moved);
+    renderTable(); flash(); scheduleSave();
+  }
+  rowDrag.active=false; rowDrag.srcIdx=null; rowDrag.type=null;
+}
+
+// ═══════════════════════ COLUMN DRAG & DROP ══════════════════════════════════
+let colDrag = { active:false, srcIdx:null, ghost:null, type:null };
+
+function startColDrag(e, colIdx, type='main'){
+  e.preventDefault();
+  colDrag.active = true;
+  colDrag.srcIdx = colIdx;
+  colDrag.type = type;
+
+  const cols = type === 'weekly' ? weeklyColDefs : colDefs;
+  const ghost = document.getElementById('dragGhost');
+  ghost.textContent = '↔ ' + cols[colIdx].label.replace(/<br>/g,' ');
+  ghost.style.display='block';
+  ghost.style.left=(e.clientX+12)+'px';
+  ghost.style.top =(e.clientY-10)+'px';
+  colDrag.ghost = ghost;
+
+  document.addEventListener('mousemove', onColDragMove);
+  document.addEventListener('mouseup',   onColDragEnd);
+}
+
+function onColDragMove(e){
+  if(!colDrag.active) return;
+  colDrag.ghost.style.left=(e.clientX+12)+'px';
+  colDrag.ghost.style.top =(e.clientY-10)+'px';
+
+  const headerId = colDrag.type === 'weekly' ? 'headerRowWeekly' : 'headerRow';
+  document.querySelectorAll('#'+headerId+' th[data-col-idx]').forEach(th=>{
+    th.classList.remove('drag-over-col');
+    const r=th.getBoundingClientRect();
+    if(e.clientX>=r.left && e.clientX<=r.right) th.classList.add('drag-over-col');
+  });
+}
+
+function onColDragEnd(e){
+  if(!colDrag.active) return;
+  colDrag.ghost.style.display='none';
+  document.removeEventListener('mousemove',onColDragMove);
+  document.removeEventListener('mouseup',onColDragEnd);
+
+  let targetIdx = null;
+  const headerId = colDrag.type === 'weekly' ? 'headerRowWeekly' : 'headerRow';
+  document.querySelectorAll('#'+headerId+' th[data-col-idx]').forEach(th=>{
+    th.classList.remove('drag-over-col');
+    const r=th.getBoundingClientRect();
+    if(e.clientX>=r.left && e.clientX<=r.right) targetIdx=+th.dataset.colIdx;
+  });
+
+  if(targetIdx!==null && targetIdx!==colDrag.srcIdx){
+    const cols = colDrag.type === 'weekly' ? weeklyColDefs : colDefs;
+    const [moved] = cols.splice(colDrag.srcIdx,1);
+    cols.splice(targetIdx,0,moved);
+    renderTable(); flash(); scheduleSave();
+  }
+  colDrag.active=false; colDrag.srcIdx=null; colDrag.type=null;
+}
+
+// ═══════════════════════ INIT ═════════════════════════════════════════════════
+loadState();
+renderFlowchart();
+</script>
+</body>
+</html>
