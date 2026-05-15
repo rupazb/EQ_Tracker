@@ -505,10 +505,10 @@ function switchMonth(m){
 
 // ═══════════════════════ TABLE RENDERING ═════════════════════════════════════
 function renderTable(type='initiatives'){
-  const source = type === 'initiatives' ? monthlyData.initiatives : monthlyData.weekly;
-  const cols = type === 'initiatives' ? colDefs : weeklyColDefs;
-  const headerId = type === 'initiatives' ? 'headerRow' : 'headerWeekly';
-  const bodyId = type === 'initiatives' ? 'tableBody' : 'tableBodyWeekly';
+  if(type !== 'initiatives') return;
+  const source = monthlyData.initiatives;
+  const cols = colDefs;
+  const bodyId = 'tableBody';
 
   renderHeaders(type);
   const body = document.getElementById(bodyId);
@@ -538,9 +538,9 @@ function renderTable(type='initiatives'){
 }
 
 function renderHeaders(type='initiatives'){
-  const cols = type === 'initiatives' ? colDefs : weeklyColDefs;
-  const headerId = type === 'initiatives' ? 'headerRow' : 'headerWeekly';
-  const hr = document.getElementById(headerId);
+  if(type !== 'initiatives') return;
+  const cols = colDefs;
+  const hr = document.getElementById('headerRow');
   if(!hr) return;
   hr.innerHTML = '';
 
@@ -598,28 +598,31 @@ function buildCell(d, col, type='initiatives'){
   if(col.numeric===true){
     return `<input type="number" min="0" value="${val}" onchange="updateCell(${d.id},'${k}','${type}',+this.value)" style="width:${col.width-8}px"/>`;
   }
-  if(k===colDefs[0]?.key || k===weeklyColDefs[0]?.key){
+  if(col.fixed){
     return `<input value="${esc(val)}" onchange="updateCell(${d.id},'${k}','${type}',this.value)" style="text-align:left;font-weight:600;width:${col.width-10}px"/>`;
   }
   return `<input value="${esc(val)}" onchange="updateCell(${d.id},'${k}','${type}',this.value)" style="width:${col.width-6}px"/>`;
 }
 
 function updateCell(id,field,type,val){
-  const source = type === 'initiatives' ? monthlyData.initiatives : monthlyData.weekly;
+  if(type !== 'initiatives') return;
+  const source = monthlyData.initiatives;
   const r = source.find(r=>r.id===id);
   if(r){ r[field]=val; renderTable(type); renderFlowchart(); scheduleSave(); }
 }
 
 function deleteRow(id,type){
-  const source = type === 'initiatives' ? monthlyData.initiatives : monthlyData.weekly;
+  if(type !== 'initiatives') return;
+  const source = monthlyData.initiatives;
   const idx = source.findIndex(r=>r.id===id);
   if(idx>-1){ source.splice(idx,1); renderTable(type); renderFlowchart(); scheduleSave(); }
 }
 
 function addRow(type){
-  const source = type === 'initiatives' ? monthlyData.initiatives : monthlyData.weekly;
-  const cols = type === 'initiatives' ? colDefs : weeklyColDefs;
-  const newRow = {id: type === 'initiatives' ? nextId++ : nextWeeklyIds[0]++};
+  if(type !== 'initiatives') return;
+  const source = monthlyData.initiatives;
+  const cols = colDefs;
+  const newRow = {id: nextId++};
   cols.forEach(col=>{ newRow[col.key] = ''; });
   source.push(newRow);
   renderTable(type);
