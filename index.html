@@ -198,6 +198,12 @@ table.tracker input:focus,table.tracker select:focus{border-color:var(--blue-lt)
       </div>
     </div>
   </div>
+  <div class="chart-section">
+    <div class="chart-section-title">Weekly Flowcharts</div>
+    <div class="chart-scroll">
+      <div id="weeklyFlowcharts"></div>
+    </div>
+  </div>
 </div>
 
 <!-- INITIATIVES & UPDATES TABLE -->
@@ -288,6 +294,18 @@ function loadMonthlyData(){
       if(m.nextWeeklyIds) nextWeeklyIds = m.nextWeeklyIds;
     }
   } catch(e){ console.warn('Load failed:', e); }
+
+  if(!Array.isArray(monthlyData.weekly) || monthlyData.weekly.length!==4){
+    monthlyData.weekly = [{data:[]},{data:[]},{data:[]},{data:[]}] ;
+  }
+
+  for(let w=0; w<4; w++){
+    if(!monthlyData.weekly[w] || !Array.isArray(monthlyData.weekly[w].data)) monthlyData.weekly[w] = {data:[]};
+    if(monthlyData.weekly[w].data.length===0){
+      monthlyData.weekly[w].data = monthlyData.initiatives.map((row, i)=>({ ...JSON.parse(JSON.stringify(row)), id: i+1 }));
+      nextWeeklyIds[w] = monthlyData.weekly[w].data.length + 1;
+    }
+  }
 }
 
 function resetState(){
@@ -331,13 +349,7 @@ function getDefaultColDefs(){
 }
 
 function getDefaultWeeklyColDefs(){
-  return [
-    {key:'title',   label:'Update Title',       width:180, fixed:true},
-    {key:'owner',   label:'Owner',              width:100},
-    {key:'status',  label:'Status',             width:100},
-    {key:'priority',label:'Priority',           width:80},
-    {key:'details', label:'Details',            width:250},
-  ];
+  return JSON.parse(JSON.stringify(getDefaultColDefs()));
 }
 
 // ═══════════════════════ LIVE DATA ═════════════════════════════════════════
@@ -371,10 +383,13 @@ function switchTab(id, btn){
 function renderFlowchart(){
   renderStats();
   document.getElementById('hubText').textContent = `GC + EQ Initiatives — ${MONTHS[currentMonth]} ${currentYear}`;
-  const row = document.getElementById('wsRow');
+  renderFlowchartRow(document.getElementById('wsRow'), monthlyData.initiatives);
+  renderWeeklyFlowcharts();
+}
+
+function renderFlowchartRow(row, data){
   row.innerHTML = '';
-  
-  monthlyData.initiatives.forEach(d=>{
+  data.forEach(d=>{
     const cls = STATUS_CLS[d.status]||'notstart';
     const dotCls = PRIO_DOT[d.priority]||'dot-low';
     const maxVal = Math.max(d.order,1);
@@ -411,6 +426,18 @@ function renderFlowchart(){
     card.addEventListener('mousemove', e=>{ const t=document.getElementById('tooltip'); t.style.left=(e.clientX+14)+'px'; t.style.top=(e.clientY-10)+'px'; });
     card.addEventListener('mouseleave',()=>hideTooltip());
     row.appendChild(card);
+  });
+}
+
+function renderWeeklyFlowcharts(){
+  const wrap = document.getElementById('weeklyFlowcharts');
+  wrap.innerHTML = '';
+  monthlyData.weekly.forEach((week,w)=>{
+    const block = document.createElement('div');
+    block.style.marginBottom = '28px';
+    block.innerHTML = `<div class="chart-section-title" style="margin-bottom:8px">Week ${w+1} — ${MONTHS[currentMonth]} ${currentYear}</div><div class="ws-row" id="wsRowWeekly${w}"></div>`;
+    wrap.appendChild(block);
+    renderFlowchartRow(block.querySelector('#wsRowWeekly'+w), week.data);
   });
 }
 
@@ -580,13 +607,13 @@ function buildCell(d, col, type='initiatives'){
 function updateCell(id,field,type,val){
   const source = type === 'initiatives' ? monthlyData.initiatives : monthlyData.weekly;
   const r = source.find(r=>r.id===id);
-  if(r){ r[field]=val; renderTable(type); scheduleSave(); }
+  if(r){ r[field]=val; renderTable(type); renderFlowchart(); scheduleSave(); }
 }
 
 function deleteRow(id,type){
   const source = type === 'initiatives' ? monthlyData.initiatives : monthlyData.weekly;
   const idx = source.findIndex(r=>r.id===id);
-  if(idx>-1){ source.splice(idx,1); renderTable(type); scheduleSave(); }
+  if(idx>-1){ source.splice(idx,1); renderTable(type); renderFlowchart(); scheduleSave(); }
 }
 
 function addRow(type){
@@ -596,7 +623,156 @@ function addRow(type){
   cols.forEach(col=>{ newRow[col.key] = ''; });
   source.push(newRow);
   renderTable(type);
+  renderFlowchart();
   scheduleSave();
+}
+
+
+function addColumn(type='initiatives'){
+  currentModalType = type;
+  const nameEl = document.getElementById('colName');
+  const keyEl = document.getElementById('colKey');
+  const typeEl = document.getElementById('colType');
+  nameEl.value = '';
+  keyEl.value = '';
+  keyEl.disabled = false;
+  typeEl.value = 'text';
+  document.querySelector('#colAddModal h3').textContent = 'Add New Column';
+  document.getElementById('addColBtn').textContent = 'Add Column';
+  document.getElementById('addColBtn').onclick = ()=>confirmAddColumn(type);
+  document.getElementById('modalOverlay').classList.add('active');
+  document.getElementById('colAddModal').classList.add('active');
+}
+
+function editColumn(type, colIdx, weekIdx=null){
+  const cols = type==='initiatives' ? colDefs : weeklyColDefs;
+  const col = cols[colIdx];
+  if(!col || col.fixed) return;
+  currentModalType = type;
+  const nameEl = document.getElementById('colName');
+  const keyEl = document.getElementById('colKey');
+  const typeEl = document.getElementById('colType');
+  nameEl.value = col.label;
+  keyEl.value = col.key;
+  keyEl.disabled = true;
+  typeEl.value = col.select ? 'select' : (col.numeric ? 'number' : 'text');
+  document.querySelector('#colAddModal h3').textContent = 'Edit Column';
+  document.getElementById('addColBtn').textContent = 'Save Changes';
+  document.getElementById('addColBtn').onclick = ()=>confirmEditColumn(type, colIdx, weekIdx);
+  document.getElementById('modalOverlay').classList.add('active');
+  document.getElementById('colAddModal').classList.add('active');
+}
+
+function confirmAddColumn(type='initiatives'){
+  const name = document.getElementById('colName').value.trim();
+  const key = document.getElementById('colKey').value.trim();
+  const colType = document.getElementById('colType').value;
+  if(!name || !key){ alert('Please fill in both Column Name and Field Key'); return; }
+  const cols = type==='initiatives' ? colDefs : weeklyColDefs;
+  const rows = type==='initiatives' ? monthlyData.initiatives : monthlyData.weekly.flatMap(w=>w.data);
+  if(cols.find(c=>c.key===key)){ alert('A column with this key already exists'); return; }
+
+  cols.push({ key, label:name, width:120, numeric:colType==='number', select:colType==='select' });
+  rows.forEach(r=>{ r[key]=''; });
+  closeColModal();
+  type==='initiatives' ? renderTable('initiatives') : renderWeeklyTables();
+  renderFlowchart();
+  scheduleSave();
+}
+
+function confirmEditColumn(type, colIdx, weekIdx=null){
+  const name = document.getElementById('colName').value.trim();
+  const colType = document.getElementById('colType').value;
+  if(!name){ alert('Please enter a Column Name'); return; }
+  const cols = type==='initiatives' ? colDefs : weeklyColDefs;
+  const col = cols[colIdx];
+  if(!col || col.fixed) return;
+  col.label = name;
+  col.numeric = colType==='number';
+  col.select = colType==='select';
+  closeColModal();
+  type==='initiatives' ? renderTable('initiatives') : renderWeeklyTables();
+  renderFlowchart();
+  scheduleSave();
+}
+
+function deleteColumn(type, colIdx){
+  const cols = type==='initiatives' ? colDefs : weeklyColDefs;
+  const col = cols[colIdx];
+  if(!col || col.fixed) return;
+  const deletedKey = col.key;
+  cols.splice(colIdx, 1);
+  if(type==='initiatives') monthlyData.initiatives.forEach(r=>delete r[deletedKey]);
+  else monthlyData.weekly.forEach(week=>week.data.forEach(r=>delete r[deletedKey]));
+  type==='initiatives' ? renderTable('initiatives') : renderWeeklyTables();
+  renderFlowchart();
+  scheduleSave();
+}
+
+function showColMenu(e, colIdx, type='initiatives'){
+  e.stopPropagation();
+  const cols = type==='initiatives' ? colDefs : weeklyColDefs;
+  const col = cols[colIdx];
+  if(!col || col.fixed) return;
+  const existing = document.querySelector('.col-menu-popup');
+  if(existing) existing.remove();
+  const popup = document.createElement('div');
+  popup.className = 'col-menu-popup';
+  popup.innerHTML = `
+    <div class="col-menu-item" onclick="editColumn('${type}',${colIdx})">Edit Column</div>
+    <div class="col-menu-item delete" onclick="deleteColumn('${type}',${colIdx})">Delete Column</div>
+  `;
+  e.target.parentElement.parentElement.appendChild(popup);
+  document.addEventListener('click', ()=>popup.remove(), {once:true});
+}
+
+let colDrag = { active:false, srcIdx:null, type:'initiatives' };
+function startColDrag(e, colIdx, type='initiatives'){
+  e.preventDefault();
+  const cols = type==='initiatives' ? colDefs : weeklyColDefs;
+  colDrag.active = true;
+  colDrag.srcIdx = colIdx;
+  colDrag.type = type;
+  const ghost = document.getElementById('dragGhost');
+  ghost.textContent = '↔ ' + (cols[colIdx]?.label || 'Column');
+  ghost.style.display='block';
+  ghost.style.left=(e.clientX+12)+'px';
+  ghost.style.top=(e.clientY-10)+'px';
+  document.addEventListener('mousemove', onColDragMove);
+  document.addEventListener('mouseup', onColDragEnd);
+}
+function onColDragMove(e){
+  if(!colDrag.active) return;
+  const ghost = document.getElementById('dragGhost');
+  ghost.style.left=(e.clientX+12)+'px';
+  ghost.style.top=(e.clientY-10)+'px';
+  const header = document.getElementById(colDrag.type==='initiatives' ? 'headerRow' : 'headerWeekly');
+  if(header) header.querySelectorAll('th[data-col-idx]').forEach(th=>{
+    th.classList.remove('drag-over-col');
+    const r=th.getBoundingClientRect();
+    if(e.clientX>=r.left && e.clientX<=r.right) th.classList.add('drag-over-col');
+  });
+}
+function onColDragEnd(e){
+  if(!colDrag.active) return;
+  document.getElementById('dragGhost').style.display='none';
+  document.removeEventListener('mousemove', onColDragMove);
+  document.removeEventListener('mouseup', onColDragEnd);
+  const header = document.getElementById(colDrag.type==='initiatives' ? 'headerRow' : 'headerWeekly');
+  let targetIdx = null;
+  if(header) header.querySelectorAll('th[data-col-idx]').forEach(th=>{
+    th.classList.remove('drag-over-col');
+    const r=th.getBoundingClientRect();
+    if(e.clientX>=r.left && e.clientX<=r.right) targetIdx=+th.dataset.colIdx;
+  });
+  if(targetIdx!==null && targetIdx!==colDrag.srcIdx){
+    const cols = colDrag.type==='initiatives' ? colDefs : weeklyColDefs;
+    const [moved] = cols.splice(colDrag.srcIdx,1);
+    cols.splice(targetIdx,0,moved);
+    colDrag.type==='initiatives' ? renderTable('initiatives') : renderWeeklyTables();
+    scheduleSave();
+  }
+  colDrag = { active:false, srcIdx:null, type:'initiatives' };
 }
 
 function saveAndRefresh(){ 
@@ -730,12 +906,13 @@ function renderWeeklyTables(){
 
 function updateWeeklyCell(w,id,field,val){
   const r = monthlyData.weekly[w].data.find(r=>r.id===id);
-  if(r){ r[field]=val; renderWeeklyTables(); scheduleSave(); }
+  if(r){ r[field]=val; renderWeeklyTables(); renderFlowchart(); scheduleSave(); }
 }
 
 function deleteWeeklyRow(w,id){
   monthlyData.weekly[w].data = monthlyData.weekly[w].data.filter(r=>r.id!==id);
   renderWeeklyTables();
+  renderFlowchart();
   scheduleSave();
 }
 
@@ -744,18 +921,11 @@ function addWeeklyRow(w){
   weeklyColDefs.forEach(col=>{ newRow[col.key] = ''; });
   monthlyData.weekly[w].data.push(newRow);
   renderWeeklyTables();
+  renderFlowchart();
   scheduleSave();
 }
 
-function addWeeklyColumn(w){
-  currentModalType = 'weekly'+w;
-  document.getElementById('modalOverlay').classList.add('active');
-  document.getElementById('colAddModal').classList.add('active');
-  document.getElementById('colName').value = '';
-  document.getElementById('colKey').value = '';
-  document.getElementById('colType').value = 'text';
-  document.getElementById('addColBtn').onclick = ()=>confirmAddWeeklyColumn(w);
-}
+function addWeeklyColumn(w){ addColumn('weekly'); }
 
 function closeColModal(){
   document.getElementById('modalOverlay').classList.remove('active');
@@ -763,44 +933,6 @@ function closeColModal(){
   currentModalType = null;
 }
 
-function confirmAddWeeklyColumn(w){
-  const name = document.getElementById('colName').value.trim();
-  const key = document.getElementById('colKey').value.trim();
-  const colType = document.getElementById('colType').value;
-  
-  if(!name || !key){
-    alert('Please fill in both Column Name and Field Key');
-    return;
-  }
-  
-  if(weeklyColDefs.find(c=>c.key===key)){
-    alert('A column with this key already exists');
-    return;
-  }
-  
-  const newCol = {
-    key: key,
-    label: name,
-    width: 120,
-    numeric: colType==='number',
-    select: colType==='select',
-  };
-  
-  weeklyColDefs.push(newCol);
-  monthlyData.weekly.forEach(week=>{ week.data.forEach(row=>{ row[key] = ''; }); });
-  
-  closeColModal();
-  renderWeeklyTables();
-  scheduleSave();
-}
-
-function deleteWeeklyColumn(w, colIdx){
-  const deletedKey = weeklyColDefs[colIdx].key;
-  weeklyColDefs.splice(colIdx, 1);
-  monthlyData.weekly.forEach(week=>{ week.data.forEach(row=>{ delete row[deletedKey]; }); });
-  renderWeeklyTables();
-  scheduleSave();
-}
 
 function showWeeklyColMenu(e, colIdx, w){
   e.stopPropagation();
@@ -813,7 +945,8 @@ function showWeeklyColMenu(e, colIdx, w){
   const popup = document.createElement('div');
   popup.className = 'col-menu-popup';
   popup.innerHTML = `
-    <div class="col-menu-item delete" onclick="deleteWeeklyColumn(${w},${colIdx})">Delete Column</div>
+    <div class="col-menu-item" onclick="editColumn('weekly',${colIdx})">Edit Column</div>
+    <div class="col-menu-item delete" onclick="deleteColumn('weekly',${colIdx})">Delete Column</div>
   `;
   
   e.target.parentElement.parentElement.appendChild(popup);
