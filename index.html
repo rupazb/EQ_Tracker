@@ -198,6 +198,12 @@ table.tracker input:focus,table.tracker select:focus{border-color:var(--blue-lt)
       </div>
     </div>
   </div>
+  <div class="chart-section">
+    <div class="chart-section-title">Weekly Flowcharts</div>
+    <div class="chart-scroll">
+      <div id="weeklyFlowcharts"></div>
+    </div>
+  </div>
 </div>
 
 <!-- INITIATIVES & UPDATES TABLE -->
@@ -288,6 +294,18 @@ function loadMonthlyData(){
       if(m.nextWeeklyIds) nextWeeklyIds = m.nextWeeklyIds;
     }
   } catch(e){ console.warn('Load failed:', e); }
+
+  if(!Array.isArray(monthlyData.weekly) || monthlyData.weekly.length!==4){
+    monthlyData.weekly = [{data:[]},{data:[]},{data:[]},{data:[]}] ;
+  }
+
+  for(let w=0; w<4; w++){
+    if(!monthlyData.weekly[w] || !Array.isArray(monthlyData.weekly[w].data)) monthlyData.weekly[w] = {data:[]};
+    if(monthlyData.weekly[w].data.length===0){
+      monthlyData.weekly[w].data = monthlyData.initiatives.map((row, i)=>({ ...JSON.parse(JSON.stringify(row)), id: i+1 }));
+      nextWeeklyIds[w] = monthlyData.weekly[w].data.length + 1;
+    }
+  }
 }
 
 function resetState(){
@@ -331,13 +349,7 @@ function getDefaultColDefs(){
 }
 
 function getDefaultWeeklyColDefs(){
-  return [
-    {key:'title',   label:'Update Title',       width:180, fixed:true},
-    {key:'owner',   label:'Owner',              width:100},
-    {key:'status',  label:'Status',             width:100},
-    {key:'priority',label:'Priority',           width:80},
-    {key:'details', label:'Details',            width:250},
-  ];
+  return JSON.parse(JSON.stringify(getDefaultColDefs()));
 }
 
 // ═══════════════════════ LIVE DATA ═════════════════════════════════════════
@@ -371,10 +383,13 @@ function switchTab(id, btn){
 function renderFlowchart(){
   renderStats();
   document.getElementById('hubText').textContent = `GC + EQ Initiatives — ${MONTHS[currentMonth]} ${currentYear}`;
-  const row = document.getElementById('wsRow');
+  renderFlowchartRow(document.getElementById('wsRow'), monthlyData.initiatives);
+  renderWeeklyFlowcharts();
+}
+
+function renderFlowchartRow(row, data){
   row.innerHTML = '';
-  
-  monthlyData.initiatives.forEach(d=>{
+  data.forEach(d=>{
     const cls = STATUS_CLS[d.status]||'notstart';
     const dotCls = PRIO_DOT[d.priority]||'dot-low';
     const maxVal = Math.max(d.order,1);
@@ -411,6 +426,18 @@ function renderFlowchart(){
     card.addEventListener('mousemove', e=>{ const t=document.getElementById('tooltip'); t.style.left=(e.clientX+14)+'px'; t.style.top=(e.clientY-10)+'px'; });
     card.addEventListener('mouseleave',()=>hideTooltip());
     row.appendChild(card);
+  });
+}
+
+function renderWeeklyFlowcharts(){
+  const wrap = document.getElementById('weeklyFlowcharts');
+  wrap.innerHTML = '';
+  monthlyData.weekly.forEach((week,w)=>{
+    const block = document.createElement('div');
+    block.style.marginBottom = '28px';
+    block.innerHTML = `<div class="chart-section-title" style="margin-bottom:8px">Week ${w+1} — ${MONTHS[currentMonth]} ${currentYear}</div><div class="ws-row" id="wsRowWeekly${w}"></div>`;
+    wrap.appendChild(block);
+    renderFlowchartRow(block.querySelector('#wsRowWeekly'+w), week.data);
   });
 }
 
@@ -580,13 +607,13 @@ function buildCell(d, col, type='initiatives'){
 function updateCell(id,field,type,val){
   const source = type === 'initiatives' ? monthlyData.initiatives : monthlyData.weekly;
   const r = source.find(r=>r.id===id);
-  if(r){ r[field]=val; renderTable(type); scheduleSave(); }
+  if(r){ r[field]=val; renderTable(type); renderFlowchart(); scheduleSave(); }
 }
 
 function deleteRow(id,type){
   const source = type === 'initiatives' ? monthlyData.initiatives : monthlyData.weekly;
   const idx = source.findIndex(r=>r.id===id);
-  if(idx>-1){ source.splice(idx,1); renderTable(type); scheduleSave(); }
+  if(idx>-1){ source.splice(idx,1); renderTable(type); renderFlowchart(); scheduleSave(); }
 }
 
 function addRow(type){
@@ -596,6 +623,7 @@ function addRow(type){
   cols.forEach(col=>{ newRow[col.key] = ''; });
   source.push(newRow);
   renderTable(type);
+  renderFlowchart();
   scheduleSave();
 }
 
@@ -648,6 +676,7 @@ function confirmAddColumn(type='initiatives'){
   rows.forEach(r=>{ r[key]=''; });
   closeColModal();
   type==='initiatives' ? renderTable('initiatives') : renderWeeklyTables();
+  renderFlowchart();
   scheduleSave();
 }
 
@@ -663,6 +692,7 @@ function confirmEditColumn(type, colIdx, weekIdx=null){
   col.select = colType==='select';
   closeColModal();
   type==='initiatives' ? renderTable('initiatives') : renderWeeklyTables();
+  renderFlowchart();
   scheduleSave();
 }
 
@@ -675,6 +705,7 @@ function deleteColumn(type, colIdx){
   if(type==='initiatives') monthlyData.initiatives.forEach(r=>delete r[deletedKey]);
   else monthlyData.weekly.forEach(week=>week.data.forEach(r=>delete r[deletedKey]));
   type==='initiatives' ? renderTable('initiatives') : renderWeeklyTables();
+  renderFlowchart();
   scheduleSave();
 }
 
@@ -875,12 +906,13 @@ function renderWeeklyTables(){
 
 function updateWeeklyCell(w,id,field,val){
   const r = monthlyData.weekly[w].data.find(r=>r.id===id);
-  if(r){ r[field]=val; renderWeeklyTables(); scheduleSave(); }
+  if(r){ r[field]=val; renderWeeklyTables(); renderFlowchart(); scheduleSave(); }
 }
 
 function deleteWeeklyRow(w,id){
   monthlyData.weekly[w].data = monthlyData.weekly[w].data.filter(r=>r.id!==id);
   renderWeeklyTables();
+  renderFlowchart();
   scheduleSave();
 }
 
@@ -889,6 +921,7 @@ function addWeeklyRow(w){
   weeklyColDefs.forEach(col=>{ newRow[col.key] = ''; });
   monthlyData.weekly[w].data.push(newRow);
   renderWeeklyTables();
+  renderFlowchart();
   scheduleSave();
 }
 
