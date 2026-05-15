@@ -596,18 +596,19 @@ function buildCell(d, col, type='initiatives'){
     return `<select onchange="updateCell(${d.id},'${k}','${type}',this.value)">${options.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
   }
   if(col.numeric===true){
-    return `<input type="number" min="0" value="${val}" onchange="updateCell(${d.id},'${k}','${type}',+this.value)" style="width:${col.width-8}px"/>`;
+    return `<input type="number" min="0" value="${val}" oninput="updateCell(${d.id},'${k}','${type}',+this.value)" style="width:${col.width-8}px"/>`;
   }
   if(col.fixed){
     return `<input value="${esc(val)}" onchange="updateCell(${d.id},'${k}','${type}',this.value)" style="text-align:left;font-weight:600;width:${col.width-10}px"/>`;
   }
-  return `<input value="${esc(val)}" onchange="updateCell(${d.id},'${k}','${type}',this.value)" style="width:${col.width-6}px"/>`;
+  return `<input value="${esc(val)}" oninput="updateCell(${d.id},'${k}','${type}',this.value)" style="width:${col.width-6}px"/>`;
 }
 
 function updateCell(id,field,type,val){
   if(type !== 'initiatives') return;
   const source = monthlyData.initiatives;
   const r = source.find(r=>r.id===id);
+  if(r){ r[field]=val; renderFlowchart(); scheduleSave(); }
   if(r){ r[field]=val; renderTable(type); renderFlowchart(); scheduleSave(); }
 }
 
@@ -884,11 +885,11 @@ function renderWeeklyTables(){
           const options = k==='status' ? ['In Progress','Not Started','Blocked','Complete'] : ['High','Medium','Low'];
           td.innerHTML = `<select onchange="updateWeeklyCell(${w},${d.id},'${k}',this.value)">${options.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
         } else if(col.numeric){
-          td.innerHTML = `<input type="number" min="0" value="${val}" onchange="updateWeeklyCell(${w},${d.id},'${k}',+this.value)" style="width:${col.width-8}px"/>`;
+          td.innerHTML = `<input type="number" min="0" value="${val}" oninput="updateWeeklyCell(${w},${d.id},'${k}',+this.value)" style="width:${col.width-8}px"/>`;
         } else if(col.fixed){
-          td.innerHTML = `<input value="${esc(val)}" onchange="updateWeeklyCell(${w},${d.id},'${k}',this.value)" style="text-align:left;font-weight:600;width:${col.width-10}px"/>`;
+          td.innerHTML = `<input value="${esc(val)}" oninput="updateWeeklyCell(${w},${d.id},'${k}',this.value)" style="text-align:left;font-weight:600;width:${col.width-10}px"/>`;
         } else {
-          td.innerHTML = `<input value="${esc(val)}" onchange="updateWeeklyCell(${w},${d.id},'${k}',this.value)" style="width:${col.width-6}px"/>`;
+          td.innerHTML = `<input value="${esc(val)}" oninput="updateWeeklyCell(${w},${d.id},'${k}',this.value)" style="width:${col.width-6}px"/>`;
         }
         tr.appendChild(td);
       });
@@ -909,6 +910,7 @@ function renderWeeklyTables(){
 
 function updateWeeklyCell(w,id,field,val){
   const r = monthlyData.weekly[w].data.find(r=>r.id===id);
+  if(r){ r[field]=val; renderFlowchart(); scheduleSave(); }
   if(r){ r[field]=val; renderWeeklyTables(); renderFlowchart(); scheduleSave(); }
 }
 
