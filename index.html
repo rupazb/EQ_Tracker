@@ -599,7 +599,7 @@ function buildCell(d, col, type='initiatives'){
     return `<input type="number" min="0" value="${val}" oninput="updateCell(${d.id},'${k}','${type}',+this.value)" style="width:${col.width-8}px"/>`;
   }
   if(col.fixed){
-    return `<input value="${esc(val)}" oninput="updateCell(${d.id},'${k}','${type}',this.value)" style="text-align:left;font-weight:600;width:${col.width-10}px"/>`;
+    return `<input value="${esc(val)}" onchange="updateCell(${d.id},'${k}','${type}',this.value)" style="text-align:left;font-weight:600;width:${col.width-10}px"/>`;
   }
   return `<input value="${esc(val)}" oninput="updateCell(${d.id},'${k}','${type}',this.value)" style="width:${col.width-6}px"/>`;
 }
@@ -608,11 +608,8 @@ function updateCell(id,field,type,val){
   if(type !== 'initiatives') return;
   const source = monthlyData.initiatives;
   const r = source.find(r=>r.id===id);
-  if(!r) return;
-  const col = colDefs.find(c=>c.key===field);
-  r[field] = col?.numeric ? (Number.isFinite(val) ? val : 0) : val;
-  renderFlowchart();
-  scheduleSave();
+  if(r){ r[field]=val; renderFlowchart(); scheduleSave(); }
+  if(r){ r[field]=val; renderTable(type); renderFlowchart(); scheduleSave(); }
 }
 
 function deleteRow(id,type){
@@ -913,11 +910,8 @@ function renderWeeklyTables(){
 
 function updateWeeklyCell(w,id,field,val){
   const r = monthlyData.weekly[w].data.find(r=>r.id===id);
-  if(!r) return;
-  const col = weeklyColDefs.find(c=>c.key===field);
-  r[field] = col?.numeric ? (Number.isFinite(val) ? val : 0) : val;
-  renderWeeklyFlowcharts();
-  scheduleSave();
+  if(r){ r[field]=val; renderFlowchart(); scheduleSave(); }
+  if(r){ r[field]=val; renderWeeklyTables(); renderFlowchart(); scheduleSave(); }
 }
 
 function deleteWeeklyRow(w,id){
